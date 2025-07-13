@@ -21,6 +21,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdlib.h>
+#include <time.h>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -56,6 +58,7 @@ void usage(void)
 		"\t[-n number of samples to read (default: 0, infinite)]\n"
 		"\t[-S force sync output (default: async)]\n"
 		"\t[-D enable direct sampling (default: off)]\n"
+		"\t[-t enable timestamping to be included in iq file (default: off)]\n"
 		"\tfilename (a '-' dumps samples to stdout)\n\n");
 	exit(1);
 }
@@ -115,6 +118,7 @@ int main(int argc, char **argv)
 	int gain = 0;
 	int ppm_error = 0;
 	int direct_sampling = 0;
+	int timestamping_iq = 0;
 	int sync_mode = 0;
 	FILE *file;
 	uint8_t *buffer;
@@ -124,7 +128,10 @@ int main(int argc, char **argv)
 	uint32_t samp_rate = DEFAULT_SAMPLE_RATE;
 	uint32_t out_block_size = DEFAULT_BUF_LENGTH;
 
-	while ((opt = getopt(argc, argv, "d:f:g:s:b:n:p:SD")) != -1) {
+	struct timespec ts;
+        char buffer_timestamp[128];
+
+	while ((opt = getopt(argc, argv, "d:f:g:s:b:n:p:SDt")) != -1) {
 		switch (opt) {
 		case 'd':
 			dev_index = verbose_device_search(optarg);
@@ -153,6 +160,9 @@ int main(int argc, char **argv)
 			break;
 		case 'D':
 			direct_sampling = 1;
+			break;
+		case 't':
+			timestamping_iq = 1;
 			break;
 		default:
 			usage();
@@ -236,6 +246,12 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Failed to open %s\n", filename);
 			goto out;
 		}
+		if(timestamping_iq == 1) {
+			clock_gettime(CLOCK_REALTIME, &ts);
+			/* Format: START_TIME=1719867600.123456789 */
+			snprintf(buffer_timestamp, sizeof(buffer_timestamp), "%s=%ld.%09ld\n", "START_TIME", ts.tv_sec, ts.tv_nsec);
+			fwrite(buffer_timestamp, 1, strlen(buffer_timestamp), file);
+		}
 	}
 
 	/* Reset endpoint before we start reading from it (mandatory) */
@@ -279,8 +295,15 @@ int main(int argc, char **argv)
 	else
 		fprintf(stderr, "\nLibrary error %d, exiting...\n", r);
 
-	if (file != stdout)
+	if (file != stdout) {
+		if(timestamping_iq == 1) {
+			clock_gettime(CLOCK_REALTIME, &ts);
+			/* Format: END_TIME=1719867600.123456789 */
+			snprintf(buffer_timestamp, sizeof(buffer_timestamp), "%s=%ld.%09ld\n", "END_TIME", ts.tv_sec, ts.tv_nsec);
+			fwrite(buffer_timestamp, 1, strlen(buffer_timestamp), file);
+		}
 		fclose(file);
+	}
 
 	rtlsdr_close(dev);
 	free (buffer);
