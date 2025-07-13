@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 		if(timestamping_iq == 1) {
 			clock_gettime(CLOCK_REALTIME, &ts);
 			/* Format: END_TIME=1719867600.123456789 */
-			snprintf(buffer_timestamp, sizeof(buffer_timestamp), "%s=%ld.%09ld\n", "END_TIME", ts.tv_sec, ts.tv_nsec);
+			snprintf(buffer_timestamp, sizeof(buffer_timestamp), "\n%s=%ld.%09ld", "END_TIME", ts.tv_sec, ts.tv_nsec);
 			fwrite(buffer_timestamp, 1, strlen(buffer_timestamp), file);
 		}
 		fclose(file);
